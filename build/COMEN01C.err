@@ -1,0 +1,16 @@
+../aws-mainframe-modernization-carddemo/app/cpy/COMEN02Y.CPY:93: warning: larger REDEFINES used [-Wdialect]
+   91 | 
+   92 | 
+   93 >          05 CDEMO-MENU-OPTIONS REDEFINES CDEMO-MENU-OPTIONS-DATA.
+   94 |            10 CDEMO-MENU-OPT OCCURS 12 TIMES.
+   95 |              15 CDEMO-MENU-OPT-NUM           PIC 9(02).
+../aws-mainframe-modernization-carddemo/app/cpy/COMEN02Y.CPY:93: note: size of 'CDEMO-MENU-OPTIONS' larger than size of 'CDEMO-MENU-OPTIONS-DATA' [-Wdialect]
+build/src/COMEN01C.cbl: in paragraph 'PROCESS-ENTER-KEY':
+build/src/COMEN01C.cbl:125: warning: inline PERFORM without imperative statement used [-Wdialect]
+  123 |                    OPTIONI OF COMEN1AI(WS-IDX:1) NOT = SPACES OR
+  124 |                    WS-IDX = 1
+  125 >            END-PERFORM
+  126 |            MOVE OPTIONI OF COMEN1AI(1:WS-IDX) TO WS-OPTION-X
+  127 |            INSPECT WS-OPTION-X REPLACING ALL ' ' BY '0'
+ld: warning: -undefined suppress is deprecated
+ld: warning: -undefined suppress is deprecated
