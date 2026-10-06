@@ -1,8 +1,7 @@
-build/src/COCRDLIC.cbl:252: warning: no previous data item of level 05 [-Wothers]
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COCRDLIC.cbl:252: warning: no previous data item of level 05 [-Wothers]
   250 |       *  File Data Array         28 CHARS X 7 ROWS = 196
   251 |       ******************************************************************
   252 >          05 WS-SCREEN-DATA.
   253 |             10 WS-ALL-ROWS                         PIC X(196).
   254 |             10 FILLER REDEFINES WS-ALL-ROWS.
-ld: warning: -undefined suppress is deprecated
 ld: warning: -undefined suppress is deprecated

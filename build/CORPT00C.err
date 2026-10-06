@@ -1,9 +1,8 @@
-build/src/CORPT00C.cbl:126: warning: larger REDEFINES used [-Wdialect]
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/CORPT00C.cbl:126: warning: larger REDEFINES used [-Wdialect]
   124 |          05 FILLER                     PIC X(80) VALUE
   125 |          "/*EOF".
   126 >         02 JOB-DATA-2 REDEFINES JOB-DATA-1.
   127 |          05 JOB-LINES OCCURS 1000 TIMES PIC X(80).
   128 | 
-build/src/CORPT00C.cbl:126: note: size of 'JOB-DATA-2' larger than size of 'JOB-DATA-1' [-Wdialect]
-ld: warning: -undefined suppress is deprecated
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/CORPT00C.cbl:126: note: size of 'JOB-DATA-2' larger than size of 'JOB-DATA-1' [-Wdialect]
 ld: warning: -undefined suppress is deprecated

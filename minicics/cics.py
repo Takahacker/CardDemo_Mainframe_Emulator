@@ -59,6 +59,7 @@ class Task(object):
         self.next_commarea = b''
         self.sent = False               # a tarefa escreveu algo no terminal?
         self.browses = {}
+        self.locked = {}                # cluster -> chave do ultimo READ UPDATE
         self.updates = []
         self._store = None
 
@@ -142,7 +143,7 @@ class Task(object):
             self.next_transid = None
             self.region.log('tarefa %d %s: ABEND %s %s' % (self.number, self.transid,
                                                          abend.code, abend.detail))
-            self.term.send(ds3270.text_screen(
+            self.term.send(ds3270.message_screen(
                 'DFHAC2206 Transaction %s failed with abend %s. %s'
                 % (self.transid, abend.code, abend.detail)))
             self.sent = True
@@ -391,6 +392,8 @@ class Task(object):
         if not row:
             raise Condition('NOTFND', 1)
         self._deliver(opts, path, row)
+        if 'UPDATE' in opts:
+            self.locked[path.base] = row[1]
         if 'GENERIC' in opts or 'GTEQ' in opts:
             self.set(opts['RIDFLD'], row[0])
 
@@ -405,20 +408,29 @@ class Task(object):
         name, path = self._file(opts)
         try:
             self.store.write(name, opts['FROM'].data, replace=True)
+            self.locked.pop(path.base, None)
         except NotFound:
             raise Condition('INVREQ', 30)
 
     def cmd_delete(self, opts):
         name, path = self._file(opts)
-        if 'RIDFLD' not in opts:
-            raise Abend('AEY9', 'DELETE sem RIDFLD nao implementado')
-        row = self.store.seek(name, self._key(opts, path).ljust(path.keylen), '==')
-        if not row:
+        if 'RIDFLD' not in opts:        # apaga o registro do ultimo READ UPDATE
+            pk = self.locked.pop(path.base, None)
+            if pk is None:
+                raise Condition('INVREQ', 47)
+        else:
+            row = self.store.seek(name, self._key(opts, path).ljust(path.keylen), '==')
+            if not row:
+                raise Condition('NOTFND', 1)
+            pk = row[1]
+        try:
+            self.store.delete(path.base, pk)
+        except NotFound:
             raise Condition('NOTFND', 1)
-        self.store.delete(path.base, row[1])
 
     def cmd_unlock(self, opts):
-        self._file(opts)
+        name, path = self._file(opts)
+        self.locked.pop(path.base, None)
 
     def cmd_startbr(self, opts):
         name, path = self._file(opts)

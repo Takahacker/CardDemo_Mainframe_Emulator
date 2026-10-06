@@ -186,6 +186,73 @@ int KIXCMD(void)
     return 0;
 }
 
+/*
+ * CEEDAYS do Language Environment: converte uma data em dia Lilian
+ * (dia 1 = 15/10/1582). Chamado pelo CSUTLDTC do CardDemo.
+ * Parametros: data e mascara (u16 tam + texto), i32 resultado e o
+ * feedback code de 12 bytes (zeros = ok; senao severidade 3 e a mensagem).
+ * Mascaras aceitas: YYYY, MM, DD e separadores literais.
+ */
+static int cee_fail(unsigned char *fc, int msg)
+{
+    static const unsigned char tail[4] = { 0x59, 0xC3, 0xC5, 0xC5 };  /* "CEE" */
+    fc[0] = 0; fc[1] = 3;
+    fc[2] = (unsigned char)(msg >> 8); fc[3] = (unsigned char)msg;
+    memcpy(fc + 4, tail, 4);
+    return 0;
+}
+
+int CEEDAYS(unsigned char *date, unsigned char *pic, unsigned char *lilian,
+            unsigned char *fc)
+{
+    static const int mdays[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    const unsigned char *d = date + 2, *p = pic + 2;
+    int dlen = (date[0] << 8) | date[1], plen = (pic[0] << 8) | pic[1];
+    int part[3] = { -1, -1, -1 };          /* ano, mes, dia */
+
+    memset(fc, 0, 12);
+    memset(lilian, 0, 4);
+    while (plen > 0 && p[plen - 1] == ' ') plen--;
+    while (dlen > 0 && d[dlen - 1] == ' ') dlen--;
+    if (plen == 0) return cee_fail(fc, 2518);
+    if (dlen < plen) return cee_fail(fc, 2507);
+
+    for (int i = 0; i < plen; ) {
+        int which, width;
+        if (plen - i >= 4 && !memcmp(p + i, "YYYY", 4)) { which = 0; width = 4; }
+        else if (plen - i >= 2 && !memcmp(p + i, "MM", 2)) { which = 1; width = 2; }
+        else if (plen - i >= 2 && !memcmp(p + i, "DD", 2)) { which = 2; width = 2; }
+        else if (p[i] == 'Y' || p[i] == 'M' || p[i] == 'D') return cee_fail(fc, 2518);
+        else {
+            if (d[i] != p[i]) return cee_fail(fc, 2508);
+            i++;
+            continue;
+        }
+        int v = 0;
+        for (int k = 0; k < width; k++) {
+            if (d[i + k] < '0' || d[i + k] > '9') return cee_fail(fc, 2520);
+            v = v * 10 + (d[i + k] - '0');
+        }
+        part[which] = v;
+        i += width;
+    }
+    int y = part[0], m = part[1], day = part[2];
+    if (y < 0 || m < 0 || day < 0) return cee_fail(fc, 2518);
+    if (m < 1 || m > 12) return cee_fail(fc, 2517);
+    int leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    if (day < 1 || day > mdays[m - 1] + (m == 2 && leap)) return cee_fail(fc, 2508);
+    if (y < 1582 || (y == 1582 && (m < 10 || (m == 10 && day < 15))))
+        return cee_fail(fc, 2513);
+
+    /* dia juliano (Fliegel-Van Flandern) menos o de 14/10/1582 */
+    long a = (14 - m) / 12, yy = y + 4800 - a, mm = m + 12 * a - 3;
+    long jdn = day + (153 * mm + 2) / 5 + 365 * yy + yy / 4 - yy / 100 + yy / 400 - 32045;
+    long n = jdn - 2299160;
+    lilian[0] = (unsigned char)(n >> 24); lilian[1] = (unsigned char)(n >> 16);
+    lilian[2] = (unsigned char)(n >> 8);  lilian[3] = (unsigned char)n;
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     const char *in = getenv("KIX_FD_IN"), *outfd = getenv("KIX_FD_OUT");

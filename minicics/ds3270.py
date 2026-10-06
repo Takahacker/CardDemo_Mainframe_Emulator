@@ -29,6 +29,8 @@ _E2A = bytes(_E2A)
 
 
 def to_ebcdic(data):
+    if isinstance(data, str):
+        data = data.encode('latin-1', 'replace')
     return bytes(data).translate(_A2E)
 
 
@@ -67,6 +69,17 @@ def text_screen(text, erase=True, alarm=False):
     """Tela nao formatada (SEND TEXT e mensagens do proprio mini-CICS)."""
     body = bytes([SBA]) + addr(0) + to_ebcdic(text) + bytes([SBA]) + addr(0) + bytes([IC])
     return write(body, erase, True, alarm)
+
+
+def message_screen(text, alarm=True):
+    """Mensagem do mini-CICS no rodape, com o cursor livre no topo da tela.
+
+    Numa tela nao formatada o terminal devolve a tela inteira; no rodape a
+    mensagem nao se mistura com a transacao que o operador digitar.
+    """
+    body = (bytes([SBA]) + addr(22 * 80) + to_ebcdic(text)
+            + bytes([SBA]) + addr(0) + bytes([IC]))
+    return write(body, True, True, alarm)
 
 
 class Inbound(object):
