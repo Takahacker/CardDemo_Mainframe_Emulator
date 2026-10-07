@@ -1,0 +1,8 @@
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTUPC.cbl: in paragraph '9100-GET-TRANSACTION-TYPE':
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTUPC.cbl:1622: warning: duplicate USING BY REFERENCE item 'DCL-TR-TYPE' [-Wothers]
+ 1620 |                BY REFERENCE SQLCA
+ 1621 |                BY REFERENCE DCL-TR-TYPE
+ 1622 >                BY REFERENCE DCL-TR-TYPE
+ 1623 |                BY REFERENCE DCL-TR-DESCRIPTION
+ 1624 |            END-CALL
+ld: warning: -undefined suppress is deprecated

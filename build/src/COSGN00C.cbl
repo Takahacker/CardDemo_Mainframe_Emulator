@@ -103,6 +103,7 @@
                BY REFERENCE CARDDEMO-COMMAREA
                BY CONTENT LENGTH OF CARDDEMO-COMMAREA
            END-CALL
+           GOBACK
            .
 
 
@@ -182,6 +183,7 @@
            CALL "KIXCMD" USING
                BY CONTENT "RETURN"
            END-CALL
+           GOBACK
            .
 
       *----------------------------------------------------------------*

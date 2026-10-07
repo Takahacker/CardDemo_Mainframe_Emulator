@@ -139,6 +139,7 @@
                BY REFERENCE WS-TRANID
                BY REFERENCE CARDDEMO-COMMAREA
            END-CALL
+           GOBACK
            .
 
       *----------------------------------------------------------------*

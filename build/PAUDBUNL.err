@@ -1,0 +1,12 @@
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/aws-mainframe-modernization-carddemo/app/app-authorization-ims-db2-mq/cpy/IMSFUNCS.CPY:27: warning: line not terminated by a newline [-Wmissing-newline]
+   25 |           05 FUNC-ISRT                 PIC X(04)      VALUE 'ISRT'.
+   26 |           05 FUNC-DLET                 PIC X(04)      VALUE 'DLET'.
+   27 >           05 PARMCOUNT                 PIC S9(05) VALUE +4 COMP-5.<EOF>
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/PAUDBUNL.cbl: in paragraph 'MAIN-PARA':
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/PAUDBUNL.cbl:158: warning: ENTRY should start in Area A [-Wothers]
+  156 |       *
+  157 |        MAIN-PARA.
+  158 >             ENTRY 'DLITCBL'                 USING PAUTBPCB.
+  159 | 
+  160 |       *
+ld: warning: -undefined suppress is deprecated

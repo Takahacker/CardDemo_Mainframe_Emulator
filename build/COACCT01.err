@@ -1,0 +1,15 @@
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COACCT01.cbl: in paragraph '1000-CONTROL':
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COACCT01.cbl:222: warning: ignoring redundant . [-Wothers]
+  220 | 012900             NO-MORE-MSGS
+  221 | 013000
+  222 > 013100     PERFORM 8000-TERMINATION.
+  223 | 013200
+  224 | 015000     .
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COACCT01.cbl: in paragraph '9000-ERROR':
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COACCT01.cbl:542: warning: ignoring redundant . [-Wothers]
+  540 | 044600              MOVE ERROR-QUEUE-NAME  TO MQ-APPL-QUEUE-NAME
+  541 | 044700              MOVE 'MQPUT ERR'       TO MQ-APPL-RETURN-MESSAGE
+  542 > 044800              DISPLAY MQ-ERR-DISPLAY
+  543 | 044900              PERFORM 8000-TERMINATION
+  544 | 045000     END-EVALUATE.
+ld: warning: -undefined suppress is deprecated

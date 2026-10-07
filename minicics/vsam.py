@@ -31,9 +31,33 @@ class Store(object):
         self.db.execute('CREATE TABLE IF NOT EXISTS kix_catalog (name TEXT PRIMARY KEY,'
                         ' base TEXT, reclen INT, keyoff INT, keylen INT, prim INT)')
         self._paths = {}
+        self.in_uow = False
 
     def close(self):
+        self.rollback()
         self.db.close()
+
+    # --- unidade de trabalho ----------------------------------------------
+    def begin(self):
+        """Abre a unidade de trabalho e toma a trava de gravacao do banco.
+
+        Outra tarefa que tente gravar (ou ler para atualizar) espera aqui
+        ate o commit/rollback: e o bloqueio do READ UPDATE, so que do
+        arquivo inteiro em vez do registro.
+        """
+        if not self.in_uow:
+            self.db.execute('BEGIN IMMEDIATE')
+            self.in_uow = True
+
+    def commit(self):
+        if self.in_uow:
+            self.db.execute('COMMIT')
+            self.in_uow = False
+
+    def rollback(self):
+        if self.in_uow:
+            self.db.execute('ROLLBACK')
+            self.in_uow = False
 
     # --- catalogo (o que o IDCAMS DEFINE faria) ---------------------------
     def define_cluster(self, name, reclen, keyoff, keylen):
@@ -51,6 +75,29 @@ class Store(object):
         self.db.execute('CREATE INDEX IF NOT EXISTS "%s_ix" ON "%s" (substr(r, %d, %d))'
                         % (name, base, keyoff + 1, keylen))
         self._paths.clear()
+
+    def delete_cluster(self, name):
+        """Remove um cluster e os caminhos definidos sobre ele."""
+        self.path(name)                 # NotFound se nao existir
+        self.db.execute('DROP TABLE IF EXISTS "%s"' % name)
+        self.db.execute('DELETE FROM kix_catalog WHERE base = ?', (name,))
+        self._paths.clear()
+
+    def delete_path(self, name):
+        if self.path(name).primary:
+            raise NotFound(name)
+        self.db.execute('DROP INDEX IF EXISTS "%s_ix"' % name)
+        self.db.execute('DELETE FROM kix_catalog WHERE name = ?', (name,))
+        self._paths.clear()
+
+    def records(self, name):
+        """Todos os registros, na ordem da chave do caminho."""
+        p = self.path(name)
+        return [bytes(r[0]) for r in self.db.execute(
+            'SELECT r FROM %s ORDER BY %s, k' % (p.table, p.expr))]
+
+    def clear(self, name):
+        self.db.execute('DELETE FROM %s' % self.path(name).table)
 
     def path(self, name):
         if name not in self._paths:
@@ -74,7 +121,7 @@ class Store(object):
         Devolve (chave no caminho, chave primaria, registro) ou None. `pk`
         desempata chaves alternativas duplicadas ao continuar um browse.
         """
-        p = self.path(name)
+        p = name if isinstance(name, Path) else self.path(name)
         desc = op in ('<', '<=')
         order = '%s %s, k %s' % (p.expr, 'DESC' if desc else 'ASC', 'DESC' if desc else 'ASC')
         if pk is not None and op != '==':

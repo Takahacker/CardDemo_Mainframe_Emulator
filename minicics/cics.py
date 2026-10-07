@@ -9,12 +9,13 @@ import os
 import struct
 import subprocess
 
-from . import ds3270
+from . import db2, dli, ds3270, mq
 from .translate import RESP
 from .vsam import Duplicate, NotFound, Store
 
-ACT_CONTINUE, ACT_EXIT, ACT_XCTL = 0, 1, 2
+ACT_CONTINUE, ACT_EXIT, ACT_XCTL, ACT_BRANCH, ACT_LINK = 0, 1, 2, 3, 4
 EPOCH_1900 = datetime.datetime(1900, 1, 1)
+INTERNAL_READER = 'JOBS'                # fila TD ligada ao leitor interno do JES
 
 
 class Condition(Exception):
@@ -32,8 +33,9 @@ class Abend(Exception):
 
 
 class Param(object):
-    def __init__(self, idx, numeric, value, data):
+    def __init__(self, idx, numeric, value, data, scale=0):
         self.idx, self.numeric, self.value, self.data = idx, numeric, value, data
+        self.scale = scale              # casas decimais (value vem sem a virgula)
 
     def text(self):
         return self.data.decode('latin-1').rstrip(' \x00')
@@ -47,9 +49,42 @@ def _packed(value, size=4):
     return bytes.fromhex(digits + ('D' if value < 0 else 'C'))
 
 
+def unpack_request(payload):
+    """Pedido do KIXCMD -> (spec, [Param])."""
+    end = payload.index(b'\x00')
+    spec = payload[:end].decode('latin-1')
+    (count,), pos = struct.unpack_from('>H', payload, end + 1), end + 3
+    values = []
+    for i in range(count):
+        kind, value, size = struct.unpack_from('>cqI', payload, pos)
+        pos += 13
+        scale = kind[0] - 0x10 if 0x10 < kind[0] < 0x30 else 0
+        values.append(Param(i + 2, kind == b'N' or scale > 0, value, payload[pos:pos + size],
+                            scale))
+        pos += size
+    return spec, values
+
+
+def pack_update(param, value):
+    """Gravacao de `value` (int, str ou bytes) em um parametro do COBOL."""
+    if isinstance(value, int):
+        if param.numeric:
+            return struct.pack('>HcQ', param.idx, b'N', value & (2 ** 64 - 1))
+        value = str(value).encode()
+    if isinstance(value, str):
+        value = value.encode('latin-1')
+    if not param.numeric:
+        value = value.ljust(len(param.data))
+    return struct.pack('>HcI', param.idx, b'X', len(value)) + value
+
+
 class Task(object):
-    def __init__(self, region, term, transid, program, commarea, inbound):
+    def __init__(self, region, term, transid, program, commarea, inbound, start_data=None):
         self.region, self.term = region, term
+        self.start_data = start_data    # dados do START / gatilho (EXEC CICS RETRIEVE)
+        self.links = []                 # niveis de LINK: estado do chamador
+        self.mq = None                  # sessao MQ (filas abertas)
+        self.dli = None                 # sessao IMS (PSB agendado)
         self.transid, self.program = transid, program
         self.commarea, self.inbound = commarea, inbound
         self.number = region.next_task_number()
@@ -61,6 +96,11 @@ class Task(object):
         self.browses = {}
         self.locked = {}                # cluster -> chave do ultimo READ UPDATE
         self.updates = []
+        self.handlers = {}              # condicao -> indice do paragrafo (HANDLE CONDITION)
+        self.ignored = set()            # condicoes de IGNORE CONDITION
+        self.abend_label = 0            # indice do paragrafo de HANDLE ABEND
+        self.sql = None                 # sessao Db2 (cursores abertos)
+        self.job = []                   # cartoes gravados na fila do leitor interno
         self._store = None
 
     # --- infraestrutura ---------------------------------------------------
@@ -87,16 +127,7 @@ class Task(object):
         """Agenda a gravacao de `value` (int ou bytes) no parametro do COBOL."""
         if param is None or param is True:
             return
-        if isinstance(value, int):
-            if param.numeric:
-                self.updates.append(struct.pack('>HcQ', param.idx, b'N', value & (2 ** 64 - 1)))
-                return
-            value = str(value).encode()
-        if isinstance(value, str):
-            value = value.encode('latin-1')
-        if not param.numeric:
-            value = value.ljust(len(param.data))
-        self.updates.append(struct.pack('>HcI', param.idx, b'X', len(value)) + value)
+        self.updates.append(pack_update(param, value))
 
     def run(self):
         to_child_r, to_child_w = os.pipe()
@@ -132,13 +163,17 @@ class Task(object):
                 proc.kill()
             code = proc.wait()
             log.close()
-            if self._store:
+            if abend is None and code != 0:
+                with open(self.region.log_path, 'rb') as f:
+                    f.seek(log_start)
+                    detail = f.read().decode('latin-1').strip().splitlines()
+                abend = Abend('ASRA', detail[-1] if detail else 'codigo de saida %d' % code)
+            if self._store:             # fim da tarefa: syncpoint implicito
+                if abend:
+                    self._store.rollback()
+                else:
+                    self._store.commit()
                 self._store.close()
-        if abend is None and code != 0:
-            with open(self.region.log_path, 'rb') as f:
-                f.seek(log_start)
-                detail = f.read().decode('latin-1').strip().splitlines()
-            abend = Abend('ASRA', detail[-1] if detail else 'codigo de saida %d' % code)
         if abend:
             self.next_transid = None
             self.region.log('tarefa %d %s: ABEND %s %s' % (self.number, self.transid,
@@ -149,15 +184,14 @@ class Task(object):
             self.sent = True
 
     def _serve(self, payload):
-        end = payload.index(b'\x00')
-        spec = payload[:end].decode('ascii').split('|')
-        (count,), pos = struct.unpack_from('>H', payload, end + 1), end + 3
-        values = []
-        for i in range(count):
-            kind, value, size = struct.unpack_from('>cqI', payload, pos)
-            pos += 13
-            values.append(Param(i + 2, kind == b'N', value, payload[pos:pos + size]))
-            pos += size
+        spec, values = unpack_request(payload)
+        if spec.startswith('SQL|'):
+            return self._sql(spec, values)
+        if spec.startswith('MQ|'):
+            return self._mq(spec, values)
+        if spec.startswith('DLI|'):
+            return self._dli(spec, values)
+        spec = spec.split('|')
         verb, opts = spec[0], {}
         for item in spec[1:]:
             if item.endswith('='):
@@ -173,14 +207,29 @@ class Task(object):
         self.region.trace('%s %s' % (verb, ' '.join(
             k if v is True else '%s(%s)' % (k, v.text()[:20]) for k, v in opts.items())))
         try:
-            result = handler(opts)
-            if result:
-                action, extra = result
-        except Condition as c:
-            self.resp, self.resp2 = c.resp, c.resp2
-            self.region.trace('  -> %s' % c.name)
-            if 'RESP' not in opts and 'NOHANDLE' not in opts:
-                raise Abend('AEI' + c.name[:1], 'condicao %s em %s nao tratada' % (c.name, verb))
+            try:
+                result = handler(opts)
+                if result:
+                    action, extra = result
+            except Condition as c:
+                self.resp, self.resp2 = c.resp, c.resp2
+                self.region.trace('  -> %s' % c.name)
+                if 'RESP' in opts or 'NOHANDLE' in opts or c.name in self.ignored:
+                    pass
+                elif c.name in self.handlers or 'ERROR' in self.handlers:
+                    action = ACT_BRANCH
+                    extra = struct.pack('>H', self.handlers.get(c.name) or self.handlers['ERROR'])
+                else:
+                    raise Abend('AEI' + c.name[:1],
+                                'condicao %s em %s nao tratada' % (c.name, verb))
+        except Abend as a:
+            # HANDLE ABEND: desvia para a rotina do programa, que fica
+            # desativada enquanto roda (um novo abend encerra a tarefa).
+            if not self.abend_label or 'CANCEL' in opts:
+                raise
+            self.region.trace('  -> abend %s, desvia para a rotina de HANDLE ABEND' % a.code)
+            action, extra = ACT_BRANCH, struct.pack('>H', self.abend_label)
+            self.abend_label = 0
         self.set(opts.get('RESP'), self.resp)
         self.set(opts.get('RESP2'), self.resp2)
         calen = None
@@ -188,6 +237,40 @@ class Task(object):
             calen = struct.unpack_from('>I', extra, 8)[0]
         return (bytes([action]) + self.eib(calen) + struct.pack('>H', len(self.updates))
                 + b''.join(self.updates) + extra)
+
+    def _sql(self, spec, values):
+        self.region.trace('EXEC ' + ' '.join(spec.split('|', 4)[1::3])[:110])
+        if self.sql is None:
+            self.sql = db2.Session()
+            db2.prepare(self.store.db)
+        updates = self.sql.execute(self.store.db, self.store.begin, spec, values)
+        code = struct.unpack_from('>i', updates[0][1], 12)[0]
+        if code:
+            self.region.trace('  -> SQLCODE %d' % code)
+        return (bytes([ACT_CONTINUE]) + self.eib() + struct.pack('>H', len(updates))
+                + b''.join(pack_update(p, v) for p, v in updates))
+
+    def _dli(self, spec, values):
+        if self.dli is None:
+            self.dli = dli.Session(self.region.ims, self.store)
+        status, updates = self.dli.exec_dli(spec, values)
+        self.region.trace('EXEC DLI %s%s' % (' '.join(spec.split('|')[1:])[:80],
+                                             ' -> %s' % status if status.strip() else ''))
+        return (bytes([ACT_CONTINUE]) + self.eib() + struct.pack('>H', len(updates))
+                + b''.join(pack_update(p, v) for p, v in updates))
+
+    def _mq(self, spec, values):
+        func = spec.split('|')[1]
+        for p in values:                # sem a spec, os indices comecam em 1
+            p.idx -= 1
+        if self.mq is None:
+            self.mq = mq.Session()
+            mq.prepare(self.store.db)
+        updates = self.mq.call(self.store.db, self.store.begin, func, values)
+        cc, rc = updates[-2][1], updates[-1][1]
+        self.region.trace('MQ%s%s' % (func, ' -> CC %d RC %d' % (cc, rc) if cc else ''))
+        return (bytes([ACT_CONTINUE]) + self.eib() + struct.pack('>H', len(updates))
+                + b''.join(pack_update(p, v) for p, v in updates))
 
     @staticmethod
     def _commarea(opts):
@@ -203,6 +286,7 @@ class Task(object):
         if program not in self.region.programs:
             raise Condition('PGMIDERR', 1)
         self.program, self.commarea = program, commarea
+        self.handlers, self.ignored, self.abend_label = {}, set(), 0
         return ACT_XCTL, program.ljust(8).encode() + struct.pack('>I', len(commarea)) + commarea
 
     # --- controle de programa ---------------------------------------------
@@ -212,7 +296,31 @@ class Task(object):
     def cmd_xctl(self, opts):
         return self._xctl(opts['PROGRAM'].text(), self._commarea(opts))
 
+    def cmd_link(self, opts):
+        program = opts['PROGRAM'].text().strip().upper()
+        if program not in self.region.programs:
+            raise Condition('PGMIDERR', 1)
+        self.links.append((self.program, self.commarea, self.handlers, self.ignored,
+                           self.abend_label))
+        self.program, self.commarea = program, self._commarea(opts)
+        self.handlers, self.ignored, self.abend_label = {}, set(), 0
+        area = opts.get('COMMAREA')
+        return ACT_LINK, program.ljust(8).encode() + struct.pack('>H', area.idx if area else 0)
+
+    def cmd_linkend(self, opts):
+        (self.program, self.commarea, self.handlers, self.ignored,
+         self.abend_label) = self.links.pop()
+
+    def cmd_retrieve(self, opts):
+        if self.start_data is None:
+            raise Condition('ENDDATA')
+        data, self.start_data = self.start_data, None
+        self.set(opts.get('INTO'), data)
+        self.set(opts.get('LENGTH'), len(data))
+
     def cmd_return(self, opts):
+        if self.links:                  # programa chamado por LINK: o GOBACK
+            return None                 # emitido pelo tradutor devolve o controle
         if 'TRANSID' in opts:
             self.next_transid = opts['TRANSID'].text().upper()
             self.next_commarea = self._commarea(opts)
@@ -221,10 +329,38 @@ class Task(object):
     def cmd_abend(self, opts):
         raise Abend(opts['ABCODE'].text() if 'ABCODE' in opts else '????', 'EXEC CICS ABEND')
 
-    def cmd_handle(self, opts):
-        pass                            # HANDLE ABEND/CONDITION: ainda no-op
+    @staticmethod
+    def _labels(opts):
+        """Opcoes de HANDLE / IGNORE: [(nome, indice do paragrafo ou 0)]."""
+        out = []
+        for item in opts:
+            name, _, index = item.partition(':')
+            if name not in ('CONDITION', 'ABEND', 'AID', 'RESP', 'RESP2', 'NOHANDLE'):
+                out.append((name, int(index or 0)))
+        return out
 
-    cmd_ignore = cmd_syncpoint = cmd_handle
+    def cmd_handle(self, opts):
+        if 'ABEND' in opts:             # LABEL(paragrafo), CANCEL ou RESET
+            self.abend_label = dict(self._labels(opts)).get('LABEL', 0)
+        elif 'CONDITION' in opts:
+            for name, index in self._labels(opts):
+                self.ignored.discard(name)
+                if index:
+                    self.handlers[name] = index
+                else:                   # sem paragrafo: volta a acao padrao
+                    self.handlers.pop(name, None)
+
+    def cmd_ignore(self, opts):
+        for name, _ in self._labels(opts):
+            self.handlers.pop(name, None)
+            self.ignored.add(name)
+
+    def cmd_syncpoint(self, opts):
+        if 'ROLLBACK' in opts:
+            self.store.rollback()
+        else:
+            self.store.commit()
+        self.locked.clear()
 
     def cmd_inquire(self, opts):
         if 'PROGRAM' in opts and opts['PROGRAM'].text().upper() not in self.region.programs:
@@ -264,6 +400,7 @@ class Task(object):
             'DATE': dsep.join([mm, dd, yy]), 'TIME': t.strftime(tsep.join(['%H', '%M', '%S'])),
             'YEAR': t.year, 'MONTHOFYEAR': t.month, 'DAYOFMONTH': t.day,
             'DAYOFWEEK': (t.weekday() + 1) % 7, 'DAYCOUNT': (t - EPOCH_1900).days,
+            'MILLISECONDS': t.microsecond // 1000,
         }
         for name, value in formats.items():
             if name in opts and opts[name] is not True:
@@ -301,7 +438,9 @@ class Task(object):
             if f.name and data is not None:
                 o = f.offset
                 length = struct.unpack_from('>h', data, o)[0]
-                if data[o + 2]:
+                # X'80' e a flag "campo apagado" deixada pelo RECEIVE MAP na
+                # mesma posicao: nao e um atributo pedido pelo programa.
+                if data[o + 2] not in (0x00, 0x80):
                     attr = data[o + 2] & 0x3F
                 if m.ext:
                     color = data[o + 3] or color
@@ -362,6 +501,7 @@ class Task(object):
     # --- arquivos ---------------------------------------------------------
     def _file(self, opts):
         name = (opts.get('DATASET') or opts['FILE']).text().upper()
+        name = self.region.files.get(name, name)    # DSN definido no CSD
         try:
             return name, self.store.path(name)
         except NotFound:
@@ -383,6 +523,8 @@ class Task(object):
     def cmd_read(self, opts):
         name, path = self._file(opts)
         key = self._key(opts, path)
+        if 'UPDATE' in opts:            # o registro fica bloqueado ate o syncpoint
+            self.store.begin()
         if 'GENERIC' in opts or 'GTEQ' in opts:
             row = self.store.seek(name, key, '>=')
             if row and 'GTEQ' not in opts and not row[0].startswith(key):
@@ -399,6 +541,7 @@ class Task(object):
 
     def cmd_write(self, opts):
         name, path = self._file(opts)
+        self.store.begin()
         try:
             self.store.write(name, opts['FROM'].data)
         except Duplicate:
@@ -406,6 +549,7 @@ class Task(object):
 
     def cmd_rewrite(self, opts):
         name, path = self._file(opts)
+        self.store.begin()
         try:
             self.store.write(name, opts['FROM'].data, replace=True)
             self.locked.pop(path.base, None)
@@ -414,6 +558,7 @@ class Task(object):
 
     def cmd_delete(self, opts):
         name, path = self._file(opts)
+        self.store.begin()
         if 'RIDFLD' not in opts:        # apaga o registro do ultimo READ UPDATE
             pk = self.locked.pop(path.base, None)
             if pk is None:
@@ -481,3 +626,10 @@ class Task(object):
             data = data[:opts['LENGTH'].number()]
         with open(os.path.join(self.region.data_dir, 'tdq_%s.txt' % queue), 'ab') as f:
             f.write(data.rstrip() + b'\n')
+        if queue.upper() == INTERNAL_READER:
+            line = data.decode('latin-1').rstrip()
+            if line.startswith('/*EOF'):
+                self.region.submit(self.job)
+                self.job = []
+            else:
+                self.job.append(line)

@@ -77,8 +77,10 @@
                                                                         
       *KIX  EXEC CICS HANDLE CONDITION PGMIDERR(PGMIDERR-ERR-PARA)
            CALL "KIXCMD" USING
-               BY CONTENT "HANDLE|CONDITION|PGMIDERR"
+               BY CONTENT "HANDLE|CONDITION|PGMIDERR:1"
            END-CALL
+           GO TO PGMIDERR-ERR-PARA DEPENDING ON RETURN-CODE
+           CONTINUE
 
            SET ERR-FLG-OFF TO TRUE                                      
                                                                         
@@ -116,6 +118,9 @@
                BY REFERENCE WS-TRANID
                BY REFERENCE CARDDEMO-COMMAREA
            END-CALL
+           GO TO PGMIDERR-ERR-PARA DEPENDING ON RETURN-CODE
+           CONTINUE
+           GOBACK
            .
                                                                         
       *----------------------------------------------------------------*
@@ -153,6 +158,8 @@
                BY REFERENCE CDEMO-ADMIN-OPT-PGMNAME(WS-OPTION)
                BY REFERENCE CARDDEMO-COMMAREA
            END-CALL
+           GO TO PGMIDERR-ERR-PARA DEPENDING ON RETURN-CODE
+           CONTINUE
                END-IF                                                   
                MOVE SPACES             TO WS-MESSAGE                    
                MOVE DFHGREEN           TO ERRMSGC  OF COADM1AO          
@@ -177,6 +184,8 @@
                BY CONTENT "XCTL|PROGRAM="
                BY REFERENCE CDEMO-TO-PROGRAM
            END-CALL
+           GO TO PGMIDERR-ERR-PARA DEPENDING ON RETURN-CODE
+           CONTINUE
            .
                                                                         
       *----------------------------------------------------------------*
@@ -196,6 +205,8 @@
                BY CONTENT 'COADM01'
                BY REFERENCE COADM1AO
            END-CALL
+           GO TO PGMIDERR-ERR-PARA DEPENDING ON RETURN-CODE
+           CONTINUE
            .
                                                                         
       *----------------------------------------------------------------*
@@ -212,6 +223,8 @@
                BY REFERENCE WS-RESP-CD
                BY REFERENCE WS-REAS-CD
            END-CALL
+           GO TO PGMIDERR-ERR-PARA DEPENDING ON RETURN-CODE
+           CONTINUE
            .
                                                                         
       *----------------------------------------------------------------*
@@ -298,6 +311,9 @@
                BY REFERENCE WS-TRANID
                BY REFERENCE CARDDEMO-COMMAREA
            END-CALL
+           GO TO PGMIDERR-ERR-PARA DEPENDING ON RETURN-CODE
+           CONTINUE
+           GOBACK
            .
            .
                                                                         
