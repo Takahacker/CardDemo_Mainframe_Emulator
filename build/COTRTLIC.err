@@ -1,0 +1,40 @@
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTLIC.cbl: in paragraph '9100-CHECK-FILTERS':
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTLIC.cbl:1918: warning: duplicate USING BY REFERENCE item 'WS-EDIT-TYPE-FLAG' [-Wothers]
+ 1916 |                BY REFERENCE WS-EDIT-TYPE-FLAG
+ 1917 |                BY REFERENCE WS-TYPE-CD-FILTER
+ 1918 >                BY REFERENCE WS-EDIT-TYPE-FLAG
+ 1919 |                BY REFERENCE WS-EDIT-DESC-FLAG
+ 1920 |                BY REFERENCE WS-TYPE-DESC-FILTER
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTLIC.cbl:1921: warning: duplicate USING BY REFERENCE item 'WS-EDIT-DESC-FLAG' [-Wothers]
+ 1919 |                BY REFERENCE WS-EDIT-DESC-FLAG
+ 1920 |                BY REFERENCE WS-TYPE-DESC-FILTER
+ 1921 >                BY REFERENCE WS-EDIT-DESC-FLAG
+ 1922 |                BY REFERENCE WS-RECORDS-COUNT
+ 1923 |            END-CALL
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTLIC.cbl: in paragraph '9400-OPEN-FORWARD-CURSOR':
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTLIC.cbl:2076: warning: duplicate USING BY REFERENCE item 'WS-EDIT-TYPE-FLAG' [-Wothers]
+ 2074 |                BY REFERENCE WS-EDIT-TYPE-FLAG
+ 2075 |                BY REFERENCE WS-TYPE-CD-FILTER
+ 2076 >                BY REFERENCE WS-EDIT-TYPE-FLAG
+ 2077 |                BY REFERENCE WS-EDIT-DESC-FLAG
+ 2078 |                BY REFERENCE WS-TYPE-DESC-FILTER
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTLIC.cbl:2079: warning: duplicate USING BY REFERENCE item 'WS-EDIT-DESC-FLAG' [-Wothers]
+ 2077 |                BY REFERENCE WS-EDIT-DESC-FLAG
+ 2078 |                BY REFERENCE WS-TYPE-DESC-FILTER
+ 2079 >                BY REFERENCE WS-EDIT-DESC-FLAG
+ 2080 |            END-CALL
+ 2081 | 195000
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTLIC.cbl: in paragraph '9500-OPEN-BACKWARD-CURSOR':
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTLIC.cbl:2148: warning: duplicate USING BY REFERENCE item 'WS-EDIT-TYPE-FLAG' [-Wothers]
+ 2146 |                BY REFERENCE WS-EDIT-TYPE-FLAG
+ 2147 |                BY REFERENCE WS-TYPE-CD-FILTER
+ 2148 >                BY REFERENCE WS-EDIT-TYPE-FLAG
+ 2149 |                BY REFERENCE WS-EDIT-DESC-FLAG
+ 2150 |                BY REFERENCE WS-TYPE-DESC-FILTER
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COTRTLIC.cbl:2151: warning: duplicate USING BY REFERENCE item 'WS-EDIT-DESC-FLAG' [-Wothers]
+ 2149 |                BY REFERENCE WS-EDIT-DESC-FLAG
+ 2150 |                BY REFERENCE WS-TYPE-DESC-FILTER
+ 2151 >                BY REFERENCE WS-EDIT-DESC-FLAG
+ 2152 |            END-CALL
+ 2153 | 200500
+ld: warning: -undefined suppress is deprecated

@@ -9,6 +9,8 @@
  * Pedido  : u32 tam | spec\0 | u16 n | n * (u8 tipo, i64 valor, u32 tam, bytes)
  * Resposta: u32 tam | u8 acao | EIB | u16 n | n * (u16 idx, u8 tipo, dado)
  *           acao 2 (XCTL) acrescenta: programa[8] | u32 calen | commarea
+ *           acao 3 (desvio de HANDLE) acrescenta: u16 indice do paragrafo
+ *           acao 4 (LINK) acrescenta: programa[8] | u16 parametro da commarea
  */
 #include <libcob.h>
 #include <stdint.h>
@@ -20,7 +22,7 @@
 #define EIB_LEN 85
 #define COMMAREA_MAX 32768
 
-enum { ACT_CONTINUE = 0, ACT_EXIT = 1, ACT_XCTL = 2 };
+enum { ACT_CONTINUE = 0, ACT_EXIT = 1, ACT_XCTL = 2, ACT_BRANCH = 3, ACT_LINK = 4 };
 
 static int fd_in, fd_out;
 static unsigned char eib[EIB_LEN];
@@ -85,9 +87,11 @@ static void write_all(const void *buf, size_t n)
 }
 
 static void run_program(const char *name, const unsigned char *data, size_t calen);
+static void simple_request(const char *spec);
 
-/* Envia o pedido montado em `out` e aplica a resposta. */
-static void exchange(int nparams)
+/* Envia o pedido montado em `out` e aplica a resposta. Devolve o indice do
+ * paragrafo de HANDLE a assumir, ou 0. */
+static int exchange(int nparams)
 {
     unsigned char hdr[4];
     hdr[0] = out_len >> 24; hdr[1] = out_len >> 16;
@@ -112,7 +116,9 @@ static void exchange(int nparams)
         int kind = *p++;
         if (kind == 'N') {
             int64_t v = (int64_t)get_int(&p, 8);
-            if (idx <= nparams) cob_put_s64_param(idx, v);
+            /* LENGTH(LENGTH OF ...) chega BY CONTENT: nao ha o que gravar */
+            if (idx <= nparams && !cob_get_param_constant(idx))
+                cob_put_s64_param(idx, v);
         } else {
             size_t n = get_int(&p, 4);
             if (idx <= nparams) {
@@ -133,7 +139,26 @@ static void exchange(int nparams)
         size_t calen = get_int(&p, 4);
         run_program(name, p, calen);   /* nao retorna */
     }
+    int branch = action == ACT_BRANCH ? (int)get_int(&p, 2) : 0;
+    if (action == ACT_LINK) {
+        /* EXEC CICS LINK: chama o programa com a commarea do chamador (a
+         * propria area, por referencia) e segue quando ele devolver o
+         * controle. O RETURN do programa chamado vira GOBACK. */
+        static unsigned char none[1];
+        char prog[9];
+        int k = 0;
+        while (k < 8 && p[k] && p[k] != ' ') { prog[k] = (char)p[k]; k++; }
+        prog[k] = 0;
+        p += 8;
+        int idx = (int)get_int(&p, 2);
+        void *argv[2] = { eib, idx && idx <= nparams ? cob_get_param_data(idx) : none };
+        free(reply);
+        cob_call(prog, 2, argv);
+        simple_request("LINKEND");
+        return 0;
+    }
     free(reply);
+    return branch;
 }
 
 static void simple_request(const char *spec)
@@ -162,29 +187,44 @@ static void run_program(const char *name, const unsigned char *data, size_t cale
     cob_stop_run(0);
 }
 
-/* Ponto de entrada chamado pelo COBOL traduzido. */
-int KIXCMD(void)
+/* Envia um comando com os parametros da chamada COBOL, a partir de `first`. */
+static int command(const char *spec, size_t spec_len, int first)
 {
     int n = cob_get_num_params();
-    if (n < 1) die("KIXCMD sem parametros");
 
     out_len = 0;
-    put(cob_get_param_data(1), cob_get_param_size(1));
+    put(spec, spec_len);
     put("", 1);
-    put_int(n - 1, 2);
-    for (int i = 2; i <= n; i++) {
+    put_int(n - first + 1, 2);
+    for (int i = first; i <= n; i++) {
         int type = cob_get_param_type(i);
         int numeric = (type & COB_TYPE_NUMERIC) && type != COB_TYPE_NUMERIC_FLOAT
                       && type != COB_TYPE_NUMERIC_DOUBLE;
         size_t size = cob_get_param_size(i);
-        put(numeric ? "N" : "X", 1);
+        /* tipo: X, N (inteiro) ou 0x10 + casas decimais */
+        int scale = numeric ? cob_get_param_scale(i) : 0;
+        unsigned char kind = !numeric ? 'X' : scale > 0 && scale < 32 ? 0x10 + scale : 'N';
+        put(&kind, 1);
         put_int(numeric ? (uint64_t)cob_get_s64_param(i) : 0, 8);
         put_int(size, 4);
         put(cob_get_param_data(i), size);
     }
-    exchange(n);
-    return 0;
+    return exchange(n);
 }
+
+/* Ponto de entrada chamado pelo COBOL traduzido. */
+int KIXCMD(void)
+{
+    if (cob_get_num_params() < 1) die("KIXCMD sem parametros");
+    return command((const char *)cob_get_param_data(1), cob_get_param_size(1), 2);
+}
+
+/* Interface de filas do MQ (MQI): atendida em minicics/mq.py. */
+int MQOPEN(void)  { command("MQ|OPEN", 7, 1);  return 0; }
+int MQCLOSE(void) { command("MQ|CLOSE", 8, 1); return 0; }
+int MQGET(void)   { command("MQ|GET", 6, 1);   return 0; }
+int MQPUT(void)   { command("MQ|PUT", 6, 1);   return 0; }
+int MQPUT1(void)  { command("MQ|PUT1", 7, 1);  return 0; }
 
 /*
  * CEEDAYS do Language Environment: converte uma data em dia Lilian
@@ -250,6 +290,26 @@ int CEEDAYS(unsigned char *date, unsigned char *pic, unsigned char *lilian,
     long n = jdn - 2299160;
     lilian[0] = (unsigned char)(n >> 24); lilian[1] = (unsigned char)(n >> 16);
     lilian[2] = (unsigned char)(n >> 8);  lilian[3] = (unsigned char)n;
+    return 0;
+}
+
+/*
+ * DSNTIAC do Db2 (versao CICS do DSNTIAR): formata a SQLCA em texto.
+ * Parametros: EIB, commarea, SQLCA, area da mensagem (meia palavra com o
+ * tamanho, depois o texto) e o tamanho da linha.
+ */
+int DSNTIAC(unsigned char *eibp, unsigned char *ca, unsigned char *sqlca,
+            unsigned char *msg, unsigned char *lrecl)
+{
+    char text[160];
+    size_t size = cob_get_num_params() >= 4 ? cob_get_param_size(4) : 0;
+    int code = (int)((sqlca[12] << 24) | (sqlca[13] << 16) | (sqlca[14] << 8) | sqlca[15]);
+    int mlen = (sqlca[16] << 8) | sqlca[17];
+    if (size <= 2) return 8;
+    if (mlen < 0 || mlen > 70) mlen = 0;
+    int n = snprintf(text, sizeof text, "DSNT408I SQLCODE = %d, %.*s", code, mlen, sqlca + 18);
+    memset(msg + 2, ' ', size - 2);
+    memcpy(msg + 2, text, (size_t)n < size - 2 ? (size_t)n : size - 2);
     return 0;
 }
 

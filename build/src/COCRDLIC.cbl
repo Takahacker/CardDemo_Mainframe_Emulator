@@ -626,6 +626,7 @@
                BY REFERENCE WS-COMMAREA
                BY CONTENT LENGTH OF WS-COMMAREA
            END-CALL
+           GOBACK
            .                                                            
        0000-MAIN-EXIT.                                                  
            EXIT                                                         
@@ -1465,6 +1466,7 @@
            CALL "KIXCMD" USING
                BY CONTENT "RETURN"
            END-CALL
+           GOBACK
            .                                                            
        SEND-PLAIN-TEXT-EXIT.                                            
            EXIT                                                         
@@ -1486,6 +1488,7 @@
            CALL "KIXCMD" USING
                BY CONTENT "RETURN"
            END-CALL
+           GOBACK
            .                                                            
        SEND-LONG-TEXT-EXIT.                                             
            EXIT                                                         

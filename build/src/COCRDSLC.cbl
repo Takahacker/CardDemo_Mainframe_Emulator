@@ -250,8 +250,10 @@
                                                                         
       *KIX  EXEC CICS HANDLE ABEND LABEL(ABEND-ROUTINE)
            CALL "KIXCMD" USING
-               BY CONTENT "HANDLE|ABEND|LABEL"
+               BY CONTENT "HANDLE|ABEND|LABEL:1"
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
            INITIALIZE CC-WORK-AREA                                      
                       WS-MISC-STORAGE                                   
@@ -336,6 +338,8 @@
                BY REFERENCE CDEMO-TO-PROGRAM
                BY REFERENCE CARDDEMO-COMMAREA
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
       ******************************************************************
       *            COMING FROM CREDIT CARD LIST SCREEN                  
       *            SELECTION CRITERIA ALREADY VALIDATED                 
@@ -410,6 +414,9 @@
                BY REFERENCE WS-COMMAREA
                BY CONTENT LENGTH OF WS-COMMAREA
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
+           GOBACK
            .                                                            
        0000-MAIN-EXIT.                                                  
            EXIT                                                         
@@ -581,6 +588,8 @@
                BY REFERENCE CCRDSLAO
                BY REFERENCE WS-RESP-CD
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
            .                                                            
        1400-SEND-SCREEN-EXIT.                                           
            EXIT                                                         
@@ -610,6 +619,8 @@
                BY REFERENCE WS-RESP-CD
                BY REFERENCE WS-REAS-CD
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
            .                                                            
                                                                         
        2100-RECEIVE-MAP-EXIT.                                           
@@ -761,6 +772,8 @@
                BY REFERENCE WS-RESP-CD
                BY REFERENCE WS-REAS-CD
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
            EVALUATE WS-RESP-CD                                          
                WHEN 0                                     
@@ -805,6 +818,8 @@
                BY REFERENCE WS-RESP-CD
                BY REFERENCE WS-REAS-CD
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
            EVALUATE WS-RESP-CD                                          
                WHEN 0                                     
@@ -840,11 +855,16 @@
                BY REFERENCE WS-LONG-MSG
                BY CONTENT LENGTH OF WS-LONG-MSG
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
       *KIX  EXEC CICS RETURN
            CALL "KIXCMD" USING
                BY CONTENT "RETURN"
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
+           GOBACK
            .                                                            
        SEND-LONG-TEXT-EXIT.                                             
            EXIT                                                         
@@ -860,11 +880,16 @@
                BY REFERENCE WS-RETURN-MSG
                BY CONTENT LENGTH OF WS-RETURN-MSG
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
       *KIX  EXEC CICS RETURN
            CALL "KIXCMD" USING
                BY CONTENT "RETURN"
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
+           GOBACK
            .                                                            
        SEND-PLAIN-TEXT-EXIT.                                            
            EXIT                                                         
@@ -888,17 +913,23 @@
                BY REFERENCE ABEND-DATA
                BY CONTENT LENGTH OF ABEND-DATA
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
       *KIX  EXEC CICS HANDLE ABEND CANCEL
            CALL "KIXCMD" USING
                BY CONTENT "HANDLE|ABEND|CANCEL"
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
       *KIX  EXEC CICS ABEND ABCODE('9999')
            CALL "KIXCMD" USING
                BY CONTENT "ABEND|ABCODE="
                BY CONTENT '9999'
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
            .                                                            
                                                                         
                                                                         

@@ -31,10 +31,7 @@
        01 PARM-VALUE                      PIC X(8).
 
 
-       LINKAGE SECTION.
-       COPY DFHEIBLK.
-       01  DFHCOMMAREA PIC X(1).
-       PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA.
+       PROCEDURE DIVISION.                                              
 
            ACCEPT PARM-VALUE      FROM SYSIN.
            MOVE  PARM-VALUE       TO MVSWAIT-TIME.

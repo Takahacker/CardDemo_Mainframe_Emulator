@@ -6,17 +6,17 @@
    57 | 005300       15 CDEMO-ADMIN-OPT-NUM           PIC 9(02).                0..
 /Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/aws-mainframe-modernization-carddemo/app/cpy/COADM02Y.CPY:55: note: size of 'CDEMO-ADMIN-OPTIONS' larger than size of 'CDEMO-ADMIN-OPTIONS-DATA' [-Wdialect]
 /Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COADM01C.cbl: in paragraph 'PROCESS-ENTER-KEY':
-/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COADM01C.cbl:130: warning: inline PERFORM without imperative statement used [-Wdialect]
-  128 |                    OPTIONI OF COADM1AI(WS-IDX:1) NOT = SPACES OR
-  129 |                    WS-IDX = 1
-  130 >            END-PERFORM
-  131 |            MOVE OPTIONI OF COADM1AI(1:WS-IDX) TO WS-OPTION-X
-  132 |            INSPECT WS-OPTION-X REPLACING ALL ' ' BY '0'
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COADM01C.cbl:135: warning: inline PERFORM without imperative statement used [-Wdialect]
+  133 |                    OPTIONI OF COADM1AI(WS-IDX:1) NOT = SPACES OR
+  134 |                    WS-IDX = 1
+  135 >            END-PERFORM
+  136 |            MOVE OPTIONI OF COADM1AI(1:WS-IDX) TO WS-OPTION-X
+  137 |            INSPECT WS-OPTION-X REPLACING ALL ' ' BY '0'
 /Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COADM01C.cbl: in paragraph 'PGMIDERR-ERR-PARA':
-/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COADM01C.cbl:301: warning: ignoring redundant . [-Wothers]
-  299 |                BY REFERENCE CARDDEMO-COMMAREA
-  300 |            END-CALL
-  301 >            .
-  302 |            .
-  303 | 
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COADM01C.cbl:317: warning: ignoring redundant . [-Wothers]
+  315 |            CONTINUE
+  316 |            GOBACK
+  317 >            .
+  318 |            .
+  319 | 
 ld: warning: -undefined suppress is deprecated

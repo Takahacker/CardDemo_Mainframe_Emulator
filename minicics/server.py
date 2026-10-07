@@ -14,20 +14,22 @@ import sys
 import threading
 import traceback
 
-from . import bms, config, ds3270
+from . import bms, config, dli, ds3270, jcl, mq
 from .cics import Task
+from .vsam import Store
 
 IAC, DONT, DO, WONT, WILL, SB, SE, EOR = 255, 254, 253, 252, 251, 250, 240, 239
 OPT_BINARY, OPT_TTYPE, OPT_EOR = 0, 24, 25
 WANTED = (OPT_BINARY, OPT_TTYPE, OPT_EOR)
 
 _TRANSACTION = re.compile(r'DEFINE\s+TRANSACTION\((\w+)\).*?PROGRAM\((\w+)\)', re.S)
+_FILE = re.compile(r'DEFINE\s+FILE\((\w+)\).*?DSNAME\(([\w.]+)\)', re.S)
 
 
 class Region(object):
     def __init__(self, carddemo=None, data_dir=None, applid='MINICICS', sysid='KIX1',
                  start=None, trace=False):
-        app = config.carddemo_app(carddemo)
+        app = self.app = config.carddemo_app(carddemo)
         self.applid, self.sysid, self.start = applid, sysid, start
         self.alarm = True
         self.data_dir = data_dir or config.DATA_DIR
@@ -45,9 +47,17 @@ class Region(object):
         self.programs = set(
             os.path.splitext(os.path.basename(p))[0]
             for p in glob.glob(os.path.join(self.lib_dir, '*' + config.MODULE_EXT)))
-        self.maps = bms.load_all(os.path.join(app, 'bms'))
-        with open(os.path.join(app, 'csd', 'CARDDEMO.CSD'), encoding='latin-1') as f:
-            self.transactions = dict(_TRANSACTION.findall(f.read()))
+        self.maps, csd = {}, ''
+        for d in config.module_dirs(app, 'bms'):
+            self.maps.update(bms.load_all(d))
+        for d in config.module_dirs(app, 'csd'):
+            for path in sorted(glob.glob(os.path.join(d, '*'))):
+                with open(path, encoding='latin-1') as f:
+                    csd += f.read() + '\n'
+        self.transactions = dict(_TRANSACTION.findall(csd))
+        self.files = dict(_FILE.findall(csd))       # arquivo CICS -> DSN do cluster / path
+        self.triggers = dict(config.MQ_TRIGGERS)    # fila MQ -> transacao
+        self.ims = dli.Definitions(config.module_dirs(app, 'ims'))  # DBDs e PSBs
 
     def next_task_number(self):
         with self._lock:
@@ -65,9 +75,66 @@ class Region(object):
         with self._lock, open(self.log_path, 'a') as f:
             f.write(line + '\n')
 
+    def submit(self, lines):
+        """Leitor interno (TDQ JOBS): executa o job em segundo plano."""
+        def run():
+            try:
+                job = jcl.submit('\n'.join(lines), self.data_dir, self.app, 'INTRDR')
+                self.log('job %s: %s (%s)' % (job.name, job.status(), job.log_path))
+            except Exception:
+                self.log('job do leitor interno: %s' % traceback.format_exc().rstrip())
+        threading.Thread(target=run, daemon=True).start()
+
     def trace(self, text):
         if self.tracing:
             self.log('  ' + text)
+
+
+class NoTerminal(object):
+    """Facilidade de uma tarefa sem terminal (iniciada por gatilho de fila)."""
+    termid = ''
+
+    def send(self, data):
+        pass
+
+
+class TriggerMonitor(threading.Thread):
+    """Faz o papel do CKTI: inicia a transacao de uma fila que recebeu mensagens."""
+
+    def __init__(self, region, interval=0.5):
+        threading.Thread.__init__(self, daemon=True)
+        self.region, self.interval = region, interval
+        self.seen = {}                  # fila -> id da ultima mensagem ja disparada
+
+    def run(self):
+        store = Store(self.region.store_path)
+        mq.prepare(store.db)
+        while True:
+            try:
+                depths = mq.depths(store.db)
+            except Exception:
+                depths = {}
+            for queue, transid in self.region.triggers.items():
+                count, last = depths.get(queue, (0, 0))
+                if count and last > self.seen.get(queue, 0):
+                    self.seen[queue] = last
+                    self.start_task(queue, transid)
+            threading.Event().wait(self.interval)
+
+    def start_task(self, queue, transid):
+        region = self.region
+        program = region.transactions.get(transid)
+        if program not in region.programs:
+            region.log('gatilho da fila %s: transacao %s desconhecida' % (queue, transid))
+            return
+        task = Task(region, NoTerminal(), transid, program, b'', ds3270.Inbound(b''),
+                    mq.trigger_message(queue, transid))
+        region.log('tarefa %d %s %s iniciada pela fila %s' % (task.number, transid, program, queue))
+        try:
+            task.run()
+        except Exception:
+            region.log('tarefa %d %s: %s' % (task.number, transid,
+                                              traceback.format_exc().rstrip()))
 
 
 class Terminal(socketserver.BaseRequestHandler):
@@ -219,6 +286,7 @@ def main(host='127.0.0.1', port=3270, **options):
     region = Region(**options)
     server = Server((host, port), Terminal)
     server.region = region
+    TriggerMonitor(region).start()
     region.log('regiao %s em %s:%d, %d programas, %d mapas, %d transacoes'
                % (region.applid, host, port, len(region.programs), len(region.maps),
                   len(region.transactions)))

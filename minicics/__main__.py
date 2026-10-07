@@ -1,7 +1,7 @@
-"""Linha de comando: python3 -m minicics {build,load,run}."""
+"""Linha de comando: python3 -m minicics {build,load,run,submit}."""
 import argparse
 
-from . import build, load, server
+from . import build, jcl, load, mq, server
 
 
 def main():
@@ -14,6 +14,20 @@ def main():
     p.add_argument('programs', nargs='*', help='programas (padrao: todos os CO*.cbl)')
 
     p = sub.add_parser('load', help='define os arquivos VSAM e carrega os dados')
+    p.add_argument('--data', help='diretorio de dados (padrao: data/)')
+    p.add_argument('--no-post', action='store_true',
+                   help='nao roda o POSTTRAN: o TRANSACT fica so com o registro inicial')
+
+    p = sub.add_parser('submit', help='executa jobs batch (JCL)')
+    p.add_argument('jobs', nargs='+', help='nome de um JCL do CardDemo (ex.: INTCALC) ou arquivo')
+    p.add_argument('--data', help='diretorio de dados (padrao: data/)')
+
+    p = sub.add_parser('mq', help='poe, le ou lista mensagens das filas MQ')
+    p.add_argument('action', choices=['put', 'get', 'depth'])
+    p.add_argument('queue', nargs='?')
+    p.add_argument('text', nargs='?', default='')
+    p.add_argument('--reply-to', default='', help='fila de resposta (MQMD ReplyToQ)')
+    p.add_argument('--wait', type=float, default=0, help='segundos de espera no get')
     p.add_argument('--data', help='diretorio de dados (padrao: data/)')
 
     p = sub.add_parser('run', help='sobe a regiao e atende terminais TN3270')
@@ -28,7 +42,11 @@ def main():
     if args.command == 'build':
         build.main(args.carddemo, args.programs)
     elif args.command == 'load':
-        load.main(args.carddemo, args.data)
+        load.main(args.carddemo, args.data, not args.no_post)
+    elif args.command == 'mq':
+        mq.main(args.data, args.action, args.queue, args.text, args.reply_to, args.wait)
+    elif args.command == 'submit':
+        jcl.main(args.carddemo, args.data, args.jobs)
     else:
         server.main(args.host, args.port, carddemo=args.carddemo, data_dir=args.data,
                     start=args.start, trace=args.trace)

@@ -370,8 +370,10 @@
                                                                         
       *KIX  EXEC CICS HANDLE ABEND LABEL(ABEND-ROUTINE)
            CALL "KIXCMD" USING
-               BY CONTENT "HANDLE|ABEND|LABEL"
+               BY CONTENT "HANDLE|ABEND|LABEL:1"
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
            INITIALIZE CC-WORK-AREA                                      
                       WS-MISC-STORAGE                                   
@@ -472,6 +474,8 @@
            CALL "KIXCMD" USING
                BY CONTENT "SYNCPOINT"
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
       *                                                                 
       *KIX  EXEC CICS XCTL PROGRAM (CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-
            CALL "KIXCMD" USING
@@ -479,6 +483,8 @@
                BY REFERENCE CDEMO-TO-PROGRAM
                BY REFERENCE CARDDEMO-COMMAREA
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
       ******************************************************************
       *       USER CAME FROM CREDIT CARD LIST SCREEN                    
       *            SO WE ALREADY HAVE THE FILTER KEYS                   
@@ -563,6 +569,9 @@
                BY REFERENCE WS-COMMAREA
                BY CONTENT LENGTH OF WS-COMMAREA
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
+           GOBACK
            .                                                            
        0000-MAIN-EXIT.                                                  
            EXIT                                                         
@@ -592,6 +601,8 @@
                BY REFERENCE WS-RESP-CD
                BY REFERENCE WS-REAS-CD
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
            INITIALIZE CCUP-NEW-DETAILS                                  
                                                                         
@@ -1345,6 +1356,8 @@
                BY REFERENCE CCRDUPAO
                BY REFERENCE WS-RESP-CD
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
            .                                                            
        3400-SEND-SCREEN-EXIT.                                           
            EXIT                                                         
@@ -1402,6 +1415,8 @@
                BY REFERENCE WS-RESP-CD
                BY REFERENCE WS-REAS-CD
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
            EVALUATE WS-RESP-CD                                          
                WHEN 0                                     
@@ -1450,6 +1465,8 @@
                BY REFERENCE WS-RESP-CD
                BY REFERENCE WS-REAS-CD
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
       ***************************************************************** 
       *    Could we lock the record ?                                   
@@ -1499,6 +1516,8 @@
                BY REFERENCE WS-RESP-CD
                BY REFERENCE WS-REAS-CD
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
            .
                                                                         
       ***************************************************************** 
@@ -1561,17 +1580,23 @@
                BY REFERENCE ABEND-DATA
                BY CONTENT LENGTH OF ABEND-DATA
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
       *KIX  EXEC CICS HANDLE ABEND CANCEL
            CALL "KIXCMD" USING
                BY CONTENT "HANDLE|ABEND|CANCEL"
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
                                                                         
       *KIX  EXEC CICS ABEND ABCODE('9999')
            CALL "KIXCMD" USING
                BY CONTENT "ABEND|ABCODE="
                BY CONTENT '9999'
            END-CALL
+           GO TO ABEND-ROUTINE DEPENDING ON RETURN-CODE
+           CONTINUE
            .                                                            
        ABEND-ROUTINE-EXIT.                                              
            EXIT                                                         

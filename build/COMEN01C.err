@@ -6,10 +6,10 @@
    95 |              15 CDEMO-MENU-OPT-NUM           PIC 9(02).
 /Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/aws-mainframe-modernization-carddemo/app/cpy/COMEN02Y.CPY:93: note: size of 'CDEMO-MENU-OPTIONS' larger than size of 'CDEMO-MENU-OPTIONS-DATA' [-Wdialect]
 /Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COMEN01C.cbl: in paragraph 'PROCESS-ENTER-KEY':
-/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COMEN01C.cbl:125: warning: inline PERFORM without imperative statement used [-Wdialect]
-  123 |                    OPTIONI OF COMEN1AI(WS-IDX:1) NOT = SPACES OR
-  124 |                    WS-IDX = 1
-  125 >            END-PERFORM
-  126 |            MOVE OPTIONI OF COMEN1AI(1:WS-IDX) TO WS-OPTION-X
-  127 |            INSPECT WS-OPTION-X REPLACING ALL ' ' BY '0'
+/Users/takahashi/Insper_Local/8º Semestre/CapstoneApex/CardDemo_Mainframe_Emulator/build/src/COMEN01C.cbl:126: warning: inline PERFORM without imperative statement used [-Wdialect]
+  124 |                    OPTIONI OF COMEN1AI(WS-IDX:1) NOT = SPACES OR
+  125 |                    WS-IDX = 1
+  126 >            END-PERFORM
+  127 |            MOVE OPTIONI OF COMEN1AI(1:WS-IDX) TO WS-OPTION-X
+  128 |            INSPECT WS-OPTION-X REPLACING ALL ' ' BY '0'
 ld: warning: -undefined suppress is deprecated
