@@ -139,10 +139,10 @@ Duas configurações de banco no lado emulador:
 | Limitação do emulador | Efeito na medição | Tratamento |
 | --- | --- | --- |
 | Um processo `kixtask` por tarefa | infla a latência e limita a vazão | medir `spawn` e descontar; avaliar reaproveitar processos |
-| `READ UPDATE` não bloqueia registro | sob concorrência o emulador parece melhor do que um CICS seria | implementar bloqueio antes das rodadas de 50+ usuários, ou restringir a conclusão a carga sem conflito |
-| `SYNCPOINT` é no-op | sem custo de log nem de rollback | declarar no relatório |
+| `READ UPDATE` bloqueia o banco inteiro, não o registro | sob concorrência de gravação o emulador serializa mais do que um CICS faria | declarar no relatório; avaliar bloqueio por registro se as rodadas de 50+ usuários mostrarem espera |
+| Unidade de trabalho é uma transação SQLite | o custo de log e de rollback é o do SQLite, não o do CICS | declarar no relatório |
 | VSAM sobre SQLite, uma conexão por tarefa | E/S sem CI/CA split, buffers LSR ou string wait | usar contagens, não tempo de E/S, como base da comparação |
-| Só os programas online | batch fica fora | escopo restrito ao online |
+| Batch roda, mas sem instrumentação | os jobs não entram nos registros por interação | escopo das medições restrito ao online, ou instrumentar `batch.py` |
 | Sem SMF, RMF ou MIPS | nenhuma métrica nativa de mainframe | o registro por interação substitui o SMF 110 |
 
 ## Referência a mainframe real
@@ -163,12 +163,12 @@ Dois caminhos sem custo para dar ordem de grandeza, ambos a confirmar:
 3. Rodar a linha de base e validar as contagens contra o `--trace`.
 4. Definir o mesmo esquema de registro no sistema moderno e o driver HTTP.
 5. Rodar as duas configurações (ponta a ponta e controle) e gerar o comparativo.
-6. Tratar bloqueio de registros, se as rodadas concorrentes forem entrar no
-   resultado.
+6. Refinar o bloqueio (hoje do banco inteiro) para registro, se as rodadas
+   concorrentes forem entrar no resultado.
 
 ## Decisões em aberto
 
 - Rodar os dois sistemas em qual classe de VM.
-- Implementar bloqueio de registros ou limitar o escopo a carga sem conflito.
+- Refinar o bloqueio para o nível de registro ou limitar o escopo a carga sem conflito.
 - Reaproveitar processos `kixtask` ou apenas descontar o `spawn`.
 - Quais jornadas e qual mistura representam a carga "típica".
